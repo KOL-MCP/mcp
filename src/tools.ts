@@ -12,6 +12,10 @@ interface Env {
   TWITTER_ACCESS_SECRET?: string;
   TWITTER_BEARER_TOKEN?: string;
   FARCASTER_API_KEY?: string;
+  EDENLAYER_API_KEY?: string;
+  MCP_SERVER_URL?: string;
+  THIRDWEB_SECRET_KEY: string;
+  SOLANA_RPC_URL: string;
 }
 
 export function setupServerTools(
@@ -342,6 +346,165 @@ export function setupServerTools(
         };
       } catch (error) {
         throw new Error(`Failed to get follower count: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  );
+
+  server.tool(
+    'register_agent_edenlayer',
+    'Register this agent on Edenlayer protocol for agent-to-agent collaboration',
+    {
+      name: z.string().describe('Agent name'),
+      description: z.string().describe('Agent description'),
+      capabilities: z.array(z.string()).describe('List of capabilities'),
+    },
+    async ({ name, description, capabilities }) => {
+      try {
+        if (!env.EDENLAYER_API_KEY) {
+          throw new Error('EDENLAYER_API_KEY not configured');
+        }
+
+        const response = await axios.post(
+          'https://api.edenlayer.com/agents',
+          {
+            name,
+            description,
+            defaultPrompt: `I am ${name}, ${description}`,
+            mcpUrl: env.MCP_SERVER_URL || 'http://localhost:8787',
+            capabilities: {
+              tools: capabilities.map(cap => ({
+                name: cap,
+                description: `${cap} capability`,
+                inputSchema: {
+                  type: 'object',
+                  properties: {},
+                },
+              })),
+            },
+          },
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Api-Key': env.EDENLAYER_API_KEY,
+            },
+          }
+        );
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                agentId: response.data.agentId,
+                registered: true,
+                timestamp: new Date().toISOString(),
+              }, null, 2)
+            }
+          ],
+        };
+      } catch (error) {
+        throw new Error(`Failed to register on Edenlayer: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  );
+
+  server.tool(
+    'discover_agents_edenlayer',
+    'Discover other AI agents on Edenlayer protocol',
+    {
+      query: z.string().optional().describe('Search query for agent discovery'),
+    },
+    async ({ query }) => {
+      try {
+        if (!env.EDENLAYER_API_KEY) {
+          throw new Error('EDENLAYER_API_KEY not configured');
+        }
+
+        const url = query
+          ? `https://api.edenlayer.com/agents?query=${encodeURIComponent(query)}`
+          : 'https://api.edenlayer.com/agents';
+
+        const response = await axios.get(url, {
+          headers: {
+            'X-Api-Key': env.EDENLAYER_API_KEY,
+          },
+        });
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                agents: response.data,
+                count: response.data.length,
+                timestamp: new Date().toISOString(),
+              }, null, 2)
+            }
+          ],
+        };
+      } catch (error) {
+        throw new Error(`Failed to discover agents: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  );
+
+  server.tool(
+    'execute_agent_task_edenlayer',
+    'Execute a task on another agent via Edenlayer protocol',
+    {
+      agentId: z.string().describe('Target agent ID'),
+      operation: z.string().describe('Operation to execute (e.g., tools/analyze)'),
+      params: z.record(z.any()).describe('Parameters for the operation'),
+    },
+    async ({ agentId, operation, params }) => {
+      try {
+        if (!env.EDENLAYER_API_KEY) {
+          throw new Error('EDENLAYER_API_KEY not configured');
+        }
+
+        const taskResponse = await axios.post(
+          'https://api.edenlayer.com/tasks',
+          {
+            agentId,
+            operation,
+            params,
+          },
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Api-Key': env.EDENLAYER_API_KEY,
+            },
+          }
+        );
+
+        const taskId = taskResponse.data.taskId;
+
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        const statusResponse = await axios.get(
+          `https://api.edenlayer.com/tasks/${taskId}`,
+          {
+            headers: {
+              'X-Api-Key': env.EDENLAYER_API_KEY,
+            },
+          }
+        );
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                taskId,
+                state: statusResponse.data.state,
+                result: statusResponse.data.result,
+                timestamp: new Date().toISOString(),
+              }, null, 2)
+            }
+          ],
+        };
+      } catch (error) {
+        throw new Error(`Failed to execute agent task: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
   );
