@@ -1,5 +1,5 @@
 import { Implementation } from '@modelcontextprotocol/sdk/types.js';
-import { McpHonoServerDO } from '@nullshot/mcp';
+import { McpHonoServerDO } from '@xava-labs/mcp';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { setupServerTools } from './tools';
 import { setupServerResources } from './resources';
