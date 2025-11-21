@@ -13,17 +13,20 @@
 	"durable_objects": {
 		"bindings": [
 		{
-			"name": "EXAMPLE_MCP_SERVER",
-			"class_name": "ExampleMcpServer"
+			"name": "KOL_MCP_SERVER",
+			"class_name": "KOLMcpServer"
 		}
 		]
 	},
 	"migrations": [
 		{
 		"tag": "v1",
-		"new_sqlite_classes": ["ExampleMcpServer"]
+		"new_sqlite_classes": ["KOLMcpServer"]
 		}
   	],
+	"vars": {
+		"SOLANA_RPC_URL": "https://api.devnet.solana.com"
+	},
 	/**
 	 * Smart Placement
 	 * Docs: https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
